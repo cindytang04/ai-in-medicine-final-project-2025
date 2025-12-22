@@ -1,21 +1,33 @@
-
-import os
-
+# ==============================
+# description:
+#   Configure environment variables to control backend selection,
+#   suppress excessive logging, and disable third-party experiment
+#   tracking (e.g., Weights & Biases).
+# ==============================
+import os 
 os.environ["DGLBACKEND"] = "pytorch"
 os.environ["DGL_SKIP_GRAPHBOLT"] = "1"
-
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["ABSL_LOGLEVEL"] = "3"
 os.environ["GLOG_minloglevel"] = "3"
 os.environ["WANDB_SILENT"] = "true"
 os.environ["WANDB_DISABLED"] = "true"
 
+# ==============================
+# description:
+#   Suppress Python warnings and TensorFlow logging output to
+#   improve readability of training logs.
+# ==============================
 import warnings
 import logging
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-# ---- Core imports ----
+# ==============================
+# description:
+#   Import core scientific, machine learning, and deep learning
+#   libraries required for molecular modeling and evaluation.
+# ==============================
 import random
 import numpy as np
 import pandas as pd
@@ -23,7 +35,11 @@ import matplotlib.pyplot as plt
 import torch
 torch.device("cpu")
 
-
+# ==============================
+# description:
+#   Disable RDKit molecule parsing warnings which can arise from
+#   invalid or uncommon SMILES strings.
+# ==============================
 from rdkit import RDLogger
 RDLogger.DisableLog("rdApp.*")
 
@@ -34,10 +50,22 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, roc_curve
 from sklearn.ensemble import RandomForestClassifier
 
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models # type: ignore
 
 
 # Reproducibility
+# ==============================
+# description:
+#   Set fixed random seeds for Python, NumPy, and TensorFlow to
+#   ensure reproducible experiments.
+#
+# @param:
+#   seed (int):
+#       Random seed value (default = 42)
+#
+# @return:
+#   None
+# ==============================
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
@@ -45,8 +73,27 @@ def set_seed(seed=42):
 
 set_seed(42)
 
-
 # Metrics + plotting helpers
+# ==============================
+# description:
+#   Compute standard binary classification metrics using predicted
+#   probabilities.
+#
+# @param:
+#   y_true (array-like):
+#       Ground truth binary labels
+#
+#   y_prob (array-like):
+#       Predicted probabilities for the positive class
+#
+#   threshold (float):
+#       Classification threshold for converting probabilities
+#       into binary predictions (default = 0.5)
+#
+# @return:
+#   dict:
+#       Dictionary containing ROC-AUC, accuracy, and F1 score
+# ==============================
 def binary_metrics(y_true, y_prob, threshold=0.5):
     y_true = np.asarray(y_true).astype(int).reshape(-1)
     y_prob = np.asarray(y_prob).reshape(-1)
@@ -57,13 +104,35 @@ def binary_metrics(y_true, y_prob, threshold=0.5):
         "f1": f1_score(y_true, y_pred),
     }
 
+# ==============================
+# description:
+#   Plot the Receiver Operating Characteristic (ROC) curve for
+#   a binary classifier.
+#
+# @param:
+#   y_true (array-like):
+#       Ground truth binary labels
+#
+#   y_prob (array-like):
+#       Predicted probabilities for the positive class
+#
+#   label (str):
+#       Label for the ROC curve legend
+#
+# @return:
+#   None
+# ==============================
 def plot_roc(y_true, y_prob, label):
     fpr, tpr, _ = roc_curve(y_true, y_prob)
     plt.plot(fpr, tpr, label=label)
 
 
 # 1) Load BBBP (MolNet)
-
+# ==============================
+# description:
+#   Load the BBBP (Blood–Brain Barrier Penetration) dataset from
+#   DeepChem MolNet using a scaffold split and raw SMILES strings.
+# ==============================
 print("Loading BBBP from DeepChem MolNet...")
 tasks, (train_raw, valid_raw, test_raw), transformers = dc.molnet.load_bbbp(
     featurizer="Raw",          # IMPORTANT: American spelling
@@ -87,10 +156,28 @@ print("Positive rate (train):", round(float(y_train.mean()), 3))
 print("\n=== 2) ECFP + RandomForest baseline ===")
 ecfp = CircularFingerprint(size=2048, radius=2)
 
+# ==============================
+# description:
+#   Convert SMILES strings into fixed-length Extended-Connectivity
+#   Fingerprints (ECFP) for use in classical machine learning models.
+#
+# @param:
+#   smiles_list (array-like):
+#       List of SMILES strings
+#
+# @return:
+#   np.ndarray:
+#       2D array of fingerprint features (n_samples × n_bits)
+# ==============================
 def featurize_ecfp(smiles_list):
     X = ecfp.featurize(smiles_list)  # (n, 2048)
     return np.asarray(X)
 
+# ==============================
+# description:
+#   Train a Random Forest classifier using ECFP features and
+#   evaluate performance on the test set.
+# ==============================
 X_train_fp = featurize_ecfp(train_smiles)
 X_valid_fp = featurize_ecfp(valid_smiles)
 X_test_fp  = featurize_ecfp(test_smiles)
@@ -121,6 +208,22 @@ PAD_IDX = 0
 UNK_IDX = 1
 vocab_size = max(char_to_idx.values()) + 1  # inclusive max + 1
 
+# ==============================
+# description:
+#   Convert SMILES strings into fixed-length integer sequences
+#   suitable for neural network input.
+#
+# @param:
+#   smiles_list (array-like):
+#       List of SMILES strings
+#
+#   max_len (int):
+#       Maximum sequence length (default = 120)
+#
+# @return:
+#   np.ndarray:
+#       Integer-encoded SMILES sequences
+# ==============================
 def smiles_to_int(smiles_list, max_len=120):
     arr = np.zeros((len(smiles_list), max_len), dtype=np.int32)
     for i, s in enumerate(smiles_list):
@@ -133,6 +236,22 @@ X_train_smi = smiles_to_int(train_smiles, MAX_LEN)
 X_valid_smi = smiles_to_int(valid_smiles, MAX_LEN)
 X_test_smi  = smiles_to_int(test_smiles,  MAX_LEN)
 
+# ==============================
+# description:
+#   Build a 1D convolutional neural network for SMILES-based
+#   molecular classification.
+#
+# @param:
+#   vocab_size (int):
+#       Number of unique characters in the SMILES vocabulary
+#
+#   max_len (int):
+#       Maximum SMILES sequence length
+#
+# @return:
+#   tf.keras.Model:
+#       Compiled Keras CNN model
+# ==============================
 def build_smiles_cnn(vocab_size, max_len):
     model = models.Sequential([
         layers.Embedding(input_dim=vocab_size, output_dim=64, input_length=max_len, mask_zero=False),
@@ -149,6 +268,11 @@ def build_smiles_cnn(vocab_size, max_len):
     )
     return model
 
+# ==============================
+# description:
+#   Train the SMILES CNN model and record loss and AUC
+#   metrics across epochs.
+# ==============================
 smiles_model = build_smiles_cnn(vocab_size, MAX_LEN)
 hist = smiles_model.fit(
     X_train_smi, y_train,
@@ -188,6 +312,22 @@ print("\n=== 4) GCN GNN (DeepChem + DGL) ===")
 
 gcn_featurizer = MolGraphConvFeaturizer(use_edges=True)
 
+# ==============================
+# description:
+#   Convert SMILES strings into molecular graph objects compatible
+#   with DeepChem graph neural networks.
+#
+# @param:
+#   smiles_list (array-like):
+#       List of SMILES strings
+#
+#   y (array-like):
+#       Corresponding binary labels
+#
+# @return:
+#   dc.data.NumpyDataset:
+#       Dataset containing molecular graphs and labels
+# ==============================
 def featurize_graph(smiles_list, y):
     graphs = []
     y_out = []
@@ -210,6 +350,11 @@ def featurize_graph(smiles_list, y):
     Y = np.array(y_out, dtype=np.int32)
     return dc.data.NumpyDataset(X=X, y=Y, ids=np.array(ids_out))
 
+# ==============================
+# description:
+#   Train a Graph Convolutional Network (GCN) on molecular graphs
+#   and evaluate validation ROC-AUC across epochs.
+# ==============================
 gcn_train = featurize_graph(train_smiles, y_train)
 gcn_valid = featurize_graph(valid_smiles, y_valid)
 gcn_test  = featurize_graph(test_smiles,  y_test)
@@ -277,7 +422,12 @@ plt.ylabel("ROC-AUC")
 plt.tight_layout()
 plt.show()
 
-#compare
+# Compare
+# ==============================
+# description:
+#   Compare Random Forest, SMILES CNN, and GCN models using
+#   test-set ROC-AUC, accuracy, and F1 score.
+# ==============================
 print("\n=== 5) Comparison ===")
 results = pd.DataFrame([
     {"model": "ECFP + RF",   "roc_auc": rf_metrics["roc_auc"],     "accuracy": rf_metrics["accuracy"],     "f1": rf_metrics["f1"]},
@@ -295,6 +445,11 @@ plt.xticks(rotation=20, ha="right")
 plt.tight_layout()
 plt.show()
 
+# ==============================
+# description:
+#   Visualize performance comparisons using bar plots and
+#   ROC curve overlays.
+# ==============================
 # ROC overlay
 plt.figure()
 plot_roc(y_test, rf_prob, "ECFP+RF")
