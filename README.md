@@ -1,6 +1,9 @@
 # ai-in-medicine-final-project-2025
+> Cindy Xin Yi Tang, Brandon Dang
+> 258355049, 258355055
 
-This project implements multiple machine learning and deep learning models to predict molecular toxicity using SMILES representations and molecular graphs.  
+
+This project implements multiple machine learning and deep learning models to predict molecular BBBP using SMILES representations and molecular graphs.  
 Models include traditional ML baselines, CNNs on SMILES encodings, and Graph Neural Networks (GCNs) using DeepChem and DGL.
 
 ## Python Version Requirement
