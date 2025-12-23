@@ -1,4 +1,15 @@
 # ==============================
+# @Authors: Cindy Tang, Brandon Dang
+# Student ID: 258355049, 258355055
+#
+# description:
+# This project implements multiple machine learning and deep learning models to 
+# predict molecular BBBP using SMILES representations and molecular graphs.
+# Models include traditional ML baselines, CNNs on SMILES encodings, and Graph Neural Networks (GCNs) using DeepChem and DGL.
+#
+# ==============================
+
+# ==============================
 # description:
 #   Configure environment variables to control backend selection,
 #   suppress excessive logging, and disable third-party experiment
@@ -277,7 +288,7 @@ smiles_model = build_smiles_cnn(vocab_size, MAX_LEN)
 hist = smiles_model.fit(
     X_train_smi, y_train,
     validation_data=(X_valid_smi, y_valid),
-    epochs=10,
+    epochs=30,
     batch_size=32,
     verbose=1
 )
@@ -372,7 +383,7 @@ gcn_model = dc.models.GCNModel(
 train_losses = []
 valid_rocs = []
 
-EPOCHS = 20
+EPOCHS = 30
 for epoch in range(1, EPOCHS + 1):
     loss = gcn_model.fit(gcn_train, nb_epoch=1)
     train_losses.append(float(loss))
